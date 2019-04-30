@@ -8,8 +8,8 @@ logs_*/
 output/
 build/
 dist/
-checkpoints/
-checkpoints_*/
+checkpoints/*
+checkpoints_*/*
 .idea/
 *.py[cod]
 *.c[cod]
