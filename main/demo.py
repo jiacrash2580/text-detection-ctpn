@@ -13,10 +13,10 @@ from nets import model_train as model
 from utils.rpn_msr.proposal_layer import proposal_layer
 from utils.text_connector.detectors import TextDetector
 
-tf.app.flags.DEFINE_string('test_data_path', 'data/demo/', '')
-tf.app.flags.DEFINE_string('output_path', 'data/res/', '')
+tf.app.flags.DEFINE_string('test_data_path', '../data/demo/', '')
+tf.app.flags.DEFINE_string('output_path', '../data/res/', '')
 tf.app.flags.DEFINE_string('gpu', '0', '')
-tf.app.flags.DEFINE_string('checkpoint_path', 'checkpoints_mlt/', '')
+tf.app.flags.DEFINE_string('checkpoint_path', '../checkpoints_mlt/', '')
 FLAGS = tf.app.flags.FLAGS
 
 
@@ -48,6 +48,7 @@ def resize_image(img):
     new_w = new_w if new_w // 16 == 0 else (new_w // 16 + 1) * 16
 
     re_im = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
     return re_im, (new_h / img_size[0], new_w / img_size[1])
 
 
@@ -80,9 +81,16 @@ def main(argv=None):
                 print(im_fn)
                 start = time.time()
                 try:
-                    im = cv2.imread(im_fn)[:, :, ::-1]
-                except:
+                    #new 去噪二值化处理
+                    im_gray = cv2.imread(im_fn, cv2.IMREAD_GRAYSCALE)
+                    bif_im = cv2.bilateralFilter(im_gray, 25, 10, 10)
+                    bin_im = cv2.adaptiveThreshold(bif_im, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 3)
+                    im = cv2.cvtColor(bin_im, cv2.COLOR_GRAY2RGB)
+                    #old 原图片
+                    #im = cv2.imread(im_fn)[:, :, ::-1]
+                except Exception as e:
                     print("Error reading image {}!".format(im_fn))
+                    print(str(e))
                     continue
 
                 img, (rh, rw) = resize_image(im)
@@ -103,18 +111,11 @@ def main(argv=None):
                 cost_time = (time.time() - start)
                 print("cost time: {:.2f}s".format(cost_time))
 
+                im_fn_info = os.path.splitext(os.path.basename(im_fn))
                 for i, box in enumerate(boxes):
-                    cv2.polylines(img, [box[:8].astype(np.int32).reshape((-1, 1, 2))], True, color=(0, 255, 0),
-                                  thickness=2)
-                img = cv2.resize(img, None, None, fx=1.0 / rh, fy=1.0 / rw, interpolation=cv2.INTER_LINEAR)
-                cv2.imwrite(os.path.join(FLAGS.output_path, os.path.basename(im_fn)), img[:, :, ::-1])
-
-                with open(os.path.join(FLAGS.output_path, os.path.splitext(os.path.basename(im_fn))[0]) + ".txt",
-                          "w") as f:
-                    for i, box in enumerate(boxes):
-                        line = ",".join(str(box[k]) for k in range(8))
-                        line += "," + str(scores[i]) + "\r\n"
-                        f.writelines(line)
+                    imgline = img[box[1]:box[5], box[0]:box[4]]
+                    imgline_fn = os.path.join(FLAGS.output_path, im_fn_info[0] + '_' + str(i) + im_fn_info[1])
+                    cv2.imwrite(imgline_fn, imgline[:, :, ::-1])
 
 
 if __name__ == '__main__':
